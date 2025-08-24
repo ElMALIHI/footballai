@@ -99,13 +99,16 @@ const Match = sequelize.define(
     status: {
       type: DataTypes.ENUM(
         'SCHEDULED',
+        'TIMED',
         'LIVE',
         'IN_PLAY',
         'PAUSED',
         'FINISHED',
         'POSTPONED',
         'SUSPENDED',
-        'CANCELLED'
+        'CANCELLED',
+        'AWARDED',
+        'NO_PLAY'
       ),
       allowNull: false,
       defaultValue: 'SCHEDULED',

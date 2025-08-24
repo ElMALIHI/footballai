@@ -228,7 +228,7 @@ class DataProcessor {
               awayTeamTla: match.awayTeam.tla,
               homeTeamCrest: match.homeTeam.crest,
               awayTeamCrest: match.awayTeam.crest,
-              status: match.status || 'SCHEDULED',
+              status: this.mapMatchStatus(match.status) || 'SCHEDULED',
               utcDate: match.utcDate ? new Date(match.utcDate) : new Date(),
               venue: match.venue,
               referee: match.referees?.[0]?.name,
@@ -251,7 +251,7 @@ class DataProcessor {
           if (!created && match.status === 'FINISHED') {
             // Update existing match with latest results
             await matchRecord.update({
-              status: match.status,
+              status: this.mapMatchStatus(match.status),
               homeTeamScore: match.score?.fullTime?.home,
               awayTeamScore: match.score?.fullTime?.away,
               homeTeamHalfTimeScore: match.score?.halfTime?.home,
@@ -479,6 +479,29 @@ class DataProcessor {
       logger.error(`Failed to get head-to-head analysis: ${homeTeamId} vs ${awayTeamId}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Map Football-Data.org API status to our internal status enum
+   */
+  mapMatchStatus(apiStatus) {
+    if (!apiStatus) return 'SCHEDULED';
+    
+    const statusMap = {
+      'SCHEDULED': 'SCHEDULED',
+      'TIMED': 'TIMED',
+      'LIVE': 'LIVE',
+      'IN_PLAY': 'IN_PLAY',
+      'PAUSED': 'PAUSED',
+      'FINISHED': 'FINISHED',
+      'POSTPONED': 'POSTPONED',
+      'SUSPENDED': 'SUSPENDED',
+      'CANCELLED': 'CANCELLED',
+      'AWARDED': 'AWARDED',
+      'NO_PLAY': 'NO_PLAY'
+    };
+    
+    return statusMap[apiStatus] || 'SCHEDULED';
   }
 
   /**
