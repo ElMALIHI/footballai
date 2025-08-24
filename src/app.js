@@ -196,10 +196,9 @@ const startServer = async () => {
     
     // Sync database models (only in development, use migrations in production)
     if (process.env.NODE_ENV === 'development') {
-      // Temporarily disable sync to avoid schema errors
-      logger.info('Development mode: skipping database sync to avoid schema conflicts');
-      // await sequelize.sync({ alter: true });
-      // logger.info('Database models synchronized');
+      logger.info('Development mode: syncing database models...');
+      await sequelize.sync({ alter: true });
+      logger.info('Database models synchronized successfully');
     } else {
       // In production, just verify the connection without syncing
       logger.info('Production mode: skipping database sync (use migrations)');
