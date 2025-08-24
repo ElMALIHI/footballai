@@ -121,7 +121,7 @@ const gracefulShutdown = async (signal) => {
     logger.info('Database connection closed');
     
     // Close Redis connection
-    await redisClient.quit();
+    await redisClient.disconnect();
     logger.info('Redis connection closed');
     
     process.exit(0);
@@ -159,6 +159,10 @@ const startServer = async () => {
       logger.info('Database models synchronized');
     }
     
+    // Connect to Redis
+    await redisClient.connect();
+    logger.info('Redis client connecting...');
+
     // Test Redis connection
     await redisClient.ping();
     logger.info('Redis connection established successfully');

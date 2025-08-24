@@ -23,7 +23,7 @@ afterAll(async () => {
   await sequelize.close();
   
   // Close Redis connection
-  await redisClient.quit();
+  await redisClient.disconnect();
 });
 
 // Mock external services
