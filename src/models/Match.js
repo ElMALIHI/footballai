@@ -24,12 +24,12 @@ const Match = sequelize.define(
     },
     season: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
       comment: 'Season year (e.g., 2023)',
     },
     stage: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
       defaultValue: 'REGULAR_SEASON',
       comment: 'Competition stage (REGULAR_SEASON, QUARTER_FINAL, etc.)',
     },
@@ -66,11 +66,11 @@ const Match = sequelize.define(
     },
     homeTeamName: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     awayTeamName: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     homeTeamShortName: {
       type: DataTypes.STRING(50),
@@ -112,7 +112,7 @@ const Match = sequelize.define(
     },
     utcDate: {
       type: DataTypes.DATE,
-      allowNull: false,
+      allowNull: true,
       comment: 'Match date and time in UTC',
     },
     venue: {

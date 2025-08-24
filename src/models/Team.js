@@ -60,11 +60,11 @@ const Team = sequelize.define(
     },
     country: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     countryCode: {
       type: DataTypes.STRING(3),
-      allowNull: false,
+      allowNull: true,
     },
     lastUpdated: {
       type: DataTypes.DATE,

@@ -30,27 +30,27 @@ const Prediction = sequelize.define(
     // Prediction probabilities
     homeTeamWinProbability: {
       type: DataTypes.DECIMAL(5, 4),
-      allowNull: false,
+      allowNull: true,
       comment: 'Predicted probability for home team win',
     },
     drawProbability: {
       type: DataTypes.DECIMAL(5, 4),
-      allowNull: false,
+      allowNull: true,
       comment: 'Predicted probability for draw',
     },
     awayTeamWinProbability: {
       type: DataTypes.DECIMAL(5, 4),
-      allowNull: false,
+      allowNull: true,
       comment: 'Predicted probability for away team win',
     },
     // Predicted outcome
     predictedWinner: {
       type: DataTypes.ENUM('HOME_TEAM', 'AWAY_TEAM', 'DRAW'),
-      allowNull: false,
+      allowNull: true,
     },
     confidence: {
       type: DataTypes.DECIMAL(5, 4),
-      allowNull: false,
+      allowNull: true,
       comment: 'Confidence level of the prediction (0-1)',
     },
     // Feature values used for prediction
