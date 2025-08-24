@@ -197,8 +197,26 @@ const startServer = async () => {
     // Sync database models (only in development, use migrations in production)
     if (process.env.NODE_ENV === 'development') {
       logger.info('Development mode: syncing database models...');
-      await sequelize.sync({ alter: true });
-      logger.info('Database models synchronized successfully');
+      
+      // Use force: true for first run to avoid enum column issues
+      const forceSync = process.env.FORCE_SYNC === 'true';
+      if (forceSync) {
+        logger.info('Force syncing database (dropping and recreating all tables)...');
+        await sequelize.sync({ force: true });
+        logger.info('Database models force synchronized successfully');
+      } else {
+        logger.info('Attempting alter sync...');
+        try {
+          await sequelize.sync({ alter: true });
+          logger.info('Database models synchronized successfully');
+        } catch (error) {
+          logger.warn('Alter sync failed, falling back to force sync:', error.message);
+          logger.info('Setting FORCE_SYNC=true and restarting...');
+          process.env.FORCE_SYNC = 'true';
+          // Restart the process to apply force sync
+          process.exit(1);
+        }
+      }
     } else {
       // In production, just verify the connection without syncing
       logger.info('Production mode: skipping database sync (use migrations)');
