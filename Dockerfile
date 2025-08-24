@@ -22,6 +22,12 @@ WORKDIR /app
 RUN apk add --no-cache dumb-init curl netcat-openbsd
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
+# Create required directories for AI training and model storage
+RUN mkdir -p /app/data/training /app/models /app/logs
+# - /app/data/training: AI training data storage
+# - /app/models: Trained AI models storage  
+# - /app/logs: Application logs
+
 # Create directories with proper ownership before switching user
 RUN chown -R nodejs:nodejs /app
 
@@ -31,6 +37,9 @@ COPY --from=build /app/src ./src
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/src/healthcheck.js ./src/healthcheck.js
 COPY --from=build /app/scripts/start.sh ./scripts/start.sh
+
+# Declare volumes for persistent data
+VOLUME ["/app/data", "/app/models", "/app/logs"]
 
 # Set script permissions
 RUN chmod +x ./scripts/start.sh
