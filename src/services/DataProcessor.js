@@ -22,11 +22,30 @@ class DataProcessor {
         return { processed: 0, errors: 0 };
       }
 
+      logger.debug(`Received ${apiData.competitions.length} competitions from API`);
+      if (apiData.competitions.length > 0) {
+        logger.debug('Sample competition data:', {
+          first: apiData.competitions[0],
+          last: apiData.competitions[apiData.competitions.length - 1]
+        });
+      }
+
       let processed = 0;
       let errors = 0;
 
       for (const comp of apiData.competitions) {
         try {
+          // Validate competition data before processing
+          if (!comp.id || !comp.name || !comp.code) {
+            logger.warn(`Skipping competition with invalid data:`, {
+              compId: comp.id,
+              compName: comp.name,
+              compCode: comp.code,
+              competition: comp
+            });
+            continue;
+          }
+
           const [competition, created] = await Competition.findOrCreate({
             where: { externalId: comp.id },
             defaults: {
@@ -96,11 +115,30 @@ class DataProcessor {
         return { processed: 0, errors: 0 };
       }
 
+      logger.debug(`Received ${apiData.teams.length} teams for competition ${competition.name}`);
+      if (apiData.teams.length > 0) {
+        logger.debug('Sample team data:', {
+          first: apiData.teams[0],
+          last: apiData.teams[apiData.teams.length - 1]
+        });
+      }
+
       let processed = 0;
       let errors = 0;
 
       for (const team of apiData.teams) {
         try {
+          // Validate team data before processing
+          if (!team.id || !team.name) {
+            logger.warn(`Skipping team with invalid data:`, {
+              teamId: team.id,
+              teamName: team.name,
+              team: team
+            });
+            this.logApiData(team, 'team');
+            continue;
+          }
+
           const [teamRecord, created] = await Team.findOrCreate({
             where: { externalId: team.id },
             defaults: {
@@ -174,11 +212,36 @@ class DataProcessor {
         return { processed: 0, errors: 0 };
       }
 
+      logger.debug(`Received ${apiData.matches.length} matches for competition ${competition.name}`);
+      if (apiData.matches.length > 0) {
+        logger.debug('Sample match data:', {
+          first: apiData.matches[0],
+          last: apiData.matches[apiData.matches.length - 1]
+        });
+      }
+
       let processed = 0;
       let errors = 0;
 
       for (const match of apiData.matches) {
         try {
+          // Validate team data before processing
+          if (!match.homeTeam?.id || !match.homeTeam?.name) {
+            logger.warn(`Skipping match ${match.id}: Invalid home team data`, {
+              homeTeam: match.homeTeam
+            });
+            this.logApiData(match.homeTeam, 'homeTeam');
+            continue;
+          }
+          
+          if (!match.awayTeam?.id || !match.awayTeam?.name) {
+            logger.warn(`Skipping match ${match.id}: Invalid away team data`, {
+              awayTeam: match.awayTeam
+            });
+            this.logApiData(match.awayTeam, 'awayTeam');
+            continue;
+          }
+
           // Find or create home and away teams
           const [homeTeam] = await Team.findOrCreate({
             where: { externalId: match.homeTeam.id },
@@ -478,6 +541,17 @@ class DataProcessor {
     } catch (error) {
       logger.error(`Failed to get head-to-head analysis: ${homeTeamId} vs ${awayTeamId}:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Log raw API data for debugging
+   */
+  logApiData(data, type) {
+    try {
+      logger.debug(`Raw ${type} API data:`, JSON.stringify(data, null, 2));
+    } catch (error) {
+      logger.debug(`Raw ${type} API data (stringified):`, String(data));
     }
   }
 
