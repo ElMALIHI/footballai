@@ -1,740 +1,365 @@
-# 🏈 Football AI Prediction API - Complete User Guide
+# 🚀 Football AI API Guide
 
-## 🚀 Quick Start
-
-### Base URL
+## 📍 **Base URL**
 ```
 http://localhost:3000/api/v1
 ```
 
-### Health Check
-First, check if the API is running:
+## 🔍 **Health Check**
 ```bash
 curl http://localhost:3000/health
 ```
 
-## 📚 Available Endpoints
+## 🧠 **AI Model Training** ⭐ **NEW!**
 
-### 1. 🏆 Competitions
-
-#### Get All Competitions
+### **Train AI Models**
 ```bash
-GET /competitions
+curl -X POST "http://localhost:3000/api/v1/admin/ai/train" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"modelTypes\": [\"random_forest\"],
+    \"crossValidationFolds\": 5,
+    \"hyperparameterTuning\": true,
+    \"maxTrainingTime\": 15
+  }"
 ```
 
-**Query Parameters:**
-- `limit` (optional): Number of results (default: 20, max: 100)
-- `offset` (optional): Number of results to skip (default: 0)
-- `plan` (optional): Filter by plan (TIER_ONE, TIER_TWO, TIER_THREE, TIER_FOUR)
-- `areas` (optional): Filter by areas
+**Options:**
+- `modelTypes`: Array of model types (`random_forest`, `neural_network`)
+- `crossValidationFolds`: Number of CV folds (2-10, default: 5)
+- `hyperparameterTuning`: Enable/disable optimization (default: true)
+- `maxTrainingTime`: Maximum training time in minutes (5-120, default: 30)
+- `season`: Specific season to train on (optional)
+- `competitionId`: Specific competition to train on (optional)
+- `daysBack`: How far back to use data (90-1095 days, default: 730)
 
-**Example:**
+### **List All Models**
 ```bash
-curl "http://localhost:3000/api/v1/competitions?limit=10&plan=TIER_ONE"
+curl "http://localhost:3000/api/v1/admin/ai/models"
 ```
 
-#### Get Specific Competition
+### **Get Model Details**
 ```bash
-GET /competitions/:id
+curl "http://localhost:3000/api/v1/admin/ai/models/random_forest_best"
 ```
 
-**Example:**
+### **Evaluate Model**
 ```bash
-curl "http://localhost:3000/api/v1/competitions/1"
+curl -X POST "http://localhost:3000/api/v1/admin/ai/evaluate/random_forest_best" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"daysBack\": 365,
+    \"competitionId\": 2021
+  }"
 ```
 
-#### Get Competition Matches
+### **Make Predictions**
 ```bash
-GET /competitions/:id/matches
+curl -X POST "http://localhost:3000/api/v1/admin/ai/predict" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"matchId\": 12345,
+    \"modelName\": \"random_forest_best\"
+  }"
 ```
 
-**Query Parameters:**
-- `season` (optional): Filter by season (e.g., 2023)
-- `limit` (optional): Number of results
-- `offset` (optional): Number of results to skip
-
-**Example:**
+### **Training Statistics**
 ```bash
-curl "http://localhost:3000/api/v1/competitions/1/matches?season=2023"
+curl "http://localhost:3000/api/v1/admin/ai/training-stats"
 ```
 
-#### Get Competition Standings
+### **Delete Model**
 ```bash
-GET /competitions/:id/standings
+curl -X DELETE "http://localhost:3000/api/v1/admin/ai/models/old_model"
 ```
 
-**Example:**
+## 🏆 **Competitions**
+
+### **Get All Competitions**
 ```bash
-curl "http://localhost:3000/api/v1/competitions/1/standings"
+curl "http://localhost:3000/api/v1/competitions"
 ```
 
-### 2. ⚽ Teams
-
-#### Get All Teams
+### **Get Competitions with Limit**
 ```bash
-GET /teams
+curl "http://localhost:3000/api/v1/competitions?limit=5"
 ```
 
-**Query Parameters:**
-- `competitionId` (optional): Filter by competition
-- `country` (optional): Filter by country
-- `limit` (optional): Number of results
-- `offset` (optional): Number of results to skip
-
-**Example:**
+### **Get Specific Competition**
 ```bash
-curl "http://localhost:3000/api/v1/teams?competitionId=1&limit=20"
+curl "http://localhost:3000/api/v1/competitions/2021"
 ```
 
-#### Get Specific Team
+## ⚽ **Teams**
+
+### **Get All Teams**
 ```bash
-GET /teams/:id
+curl "http://localhost:3000/api/v1/teams"
 ```
 
-**Example:**
+### **Get Teams with Pagination**
+```bash
+curl "http://localhost:3000/api/v1/teams?page=1&limit=20"
+```
+
+### **Get Specific Team**
 ```bash
 curl "http://localhost:3000/api/v1/teams/1"
 ```
 
-#### Get Team Matches
+### **Get Teams by Competition**
 ```bash
-GET /teams/:id/matches
+curl "http://localhost:3000/api/v1/teams?competitionId=2021"
 ```
 
-**Query Parameters:**
-- `season` (optional): Filter by season
-- `limit` (optional): Number of results
-- `offset` (optional): Number of results to skip
+## 🏟️ **Matches**
 
-**Example:**
+### **Get All Matches**
 ```bash
-curl "http://localhost:3000/api/v1/teams/1/matches?season=2023"
+curl "http://localhost:3000/api/v1/matches"
 ```
 
-#### Get Team Form
+### **Get Matches with Filters**
 ```bash
-GET /teams/:id/form
+curl "http://localhost:3000/api/v1/matches?status=FINISHED&limit=10"
 ```
 
-**Example:**
+### **Get Specific Match**
 ```bash
-curl "http://localhost:3000/api/v1/teams/1/form"
+curl "http://localhost:3000/api/v1/matches/12345"
 ```
 
-#### Get Team Stats
+### **Get Matches by Competition**
 ```bash
-GET /teams/:id/stats
+curl "http://localhost:3000/api/v1/matches?competitionId=2021"
 ```
 
-**Example:**
+### **Get Matches by Date Range**
 ```bash
-curl "http://localhost:3000/api/v1/teams/1/stats"
+curl "http://localhost:3000/api/v1/matches?dateFrom=2024-01-01&dateTo=2024-12-31"
 ```
 
-### 3. 🎯 Matches
+## 🔮 **Predictions**
 
-#### Get All Matches
+### **Get All Predictions**
 ```bash
-GET /matches
+curl "http://localhost:3000/api/v1/predictions"
 ```
 
-**Query Parameters:**
-- `competitionId` (optional): Filter by competition
-- `status` (optional): Filter by status (SCHEDULED, LIVE, FINISHED, etc.)
-- `dateFrom` (optional): Start date (YYYY-MM-DD)
-- `dateTo` (optional): End date (YYYY-MM-DD)
-- `limit` (optional): Number of results
-- `offset` (optional): Number of results to skip
-
-**Example:**
+### **Get Predictions by Match**
 ```bash
-curl "http://localhost:3000/api/v1/matches?competitionId=1&status=FINISHED&dateFrom=2023-08-01&dateTo=2023-08-31"
+curl "http://localhost:3000/api/v1/predictions?matchId=12345"
 ```
 
-#### Get Specific Match
+### **Create Prediction**
 ```bash
-GET /matches/:id
-```
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/matches/1"
-```
-
-#### Get Head-to-Head Analysis
-```bash
-GET /matches/:id/head2head
-```
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/matches/1/head2head"
-```
-
-#### Get Upcoming Matches
-```bash
-GET /matches/upcoming
-```
-
-**Query Parameters:**
-- `competitionId` (optional): Filter by competition
-- `limit` (optional): Number of results
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/matches/upcoming?competitionId=1&limit=10"
-```
-
-#### Get Live Matches
-```bash
-GET /matches/live
-```
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/matches/live"
-```
-
-### 4. 🤖 AI Predictions
-
-#### Train ML Models
-```bash
-POST /predictions/train
-```
-
-**Request Body:**
-```json
-{
-  "competitionId": 1,
-  "season": 2023,
-  "modelTypes": ["random_forest", "neural_network"],
-  "trainingOptions": {
-    "randomForest": {
-      "nEstimators": 100,
-      "maxDepth": 10
-    },
-    "neuralNetwork": {
-      "layers": [64, 32, 16],
-      "learningRate": 0.001,
-      "epochs": 100
-    }
-  }
-}
-```
-
-**Example:**
-```bash
-curl -X POST "http://localhost:3000/api/v1/predictions/train" \
+curl -X POST "http://localhost:3000/api/v1/predictions" \
   -H "Content-Type: application/json" \
-  -d '{
-    "competitionId": 1,
-    "season": 2023,
-    "modelTypes": ["random_forest"]
-  }'
+  -d "{
+    \"matchId\": 12345,
+    \"predictedWinner\": \"HOME_TEAM\",
+    \"confidence\": 0.75
+  }"
 ```
 
-#### Make Match Prediction
+## 💰 **Betting Analysis**
+
+### **Get Betting Analysis**
 ```bash
-POST /predictions/predict
+curl "http://localhost:3000/api/v1/betting/analyze?matchId=12345"
 ```
 
-**Request Body:**
-```json
-{
-  "matchId": 123,
-  "modelName": "random_forest_v1"
-}
-```
-
-**Example:**
+### **Get Value Bets**
 ```bash
-curl -X POST "http://localhost:3000/api/v1/predictions/predict" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "matchId": 123
-  }'
+curl "http://localhost:3000/api/v1/betting/value-bets?competitionId=2021"
 ```
 
-#### Bulk Predictions
+## 📊 **Analytics**
+
+### **Get Team Analytics**
 ```bash
-POST /predictions/bulk
+curl "http://localhost:3000/api/v1/analytics/teams/1"
 ```
 
-**Request Body:**
-```json
-{
-  "matchIds": [123, 124, 125],
-  "modelName": "random_forest_v1"
-}
-```
-
-**Example:**
+### **Get Competition Analytics**
 ```bash
-curl -X POST "http://localhost:3000/api/v1/predictions/bulk" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "matchIds": [123, 124, 125]
-  }'
+curl "http://localhost:3000/api/v1/analytics/competitions/2021"
 ```
 
-#### Get Prediction History
+### **Get Performance Metrics**
 ```bash
-GET /predictions/history
+curl "http://localhost:3000/api/v1/analytics/performance?days=30"
 ```
 
-**Query Parameters:**
-- `competitionId` (optional): Filter by competition
-- `modelName` (optional): Filter by model
-- `limit` (optional): Number of results (default: 100, max: 1000)
-- `offset` (optional): Number of results to skip
-- `includeResults` (optional): Include actual results (default: true)
+## ⚙️ **Admin & Setup**
 
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/predictions/history?competitionId=1&limit=50"
-```
-
-#### Get Available Models
-```bash
-GET /predictions/models
-```
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/predictions/models"
-```
-
-#### Get Model Performance
-```bash
-GET /predictions/performance/:modelName
-```
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/predictions/performance/random_forest_v1"
-```
-
-### 5. 💰 Betting Analysis
-
-#### Analyze Betting Odds
-```bash
-POST /betting/analyze
-```
-
-**Request Body:**
-```json
-{
-  "matchId": 123,
-  "odds": {
-    "homeWin": 2.10,
-    "draw": 3.20,
-    "awayWin": 3.50
-  }
-}
-```
-
-**Example:**
-```bash
-curl -X POST "http://localhost:3000/api/v1/betting/analyze" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "matchId": 123,
-    "odds": {
-      "homeWin": 2.10,
-      "draw": 3.20,
-      "awayWin": 3.50
-    }
-  }'
-```
-
-#### Bulk Betting Analysis
-```bash
-POST /betting/bulk-analyze
-```
-
-**Request Body:**
-```json
-{
-  "matches": [
-    {
-      "matchId": 123,
-      "odds": {
-        "homeWin": 2.10,
-        "draw": 3.20,
-        "awayWin": 3.50
-      }
-    }
-  ]
-}
-```
-
-#### Get Betting Performance
-```bash
-GET /betting/performance
-```
-
-**Query Parameters:**
-- `competitionId` (optional): Filter by competition
-- `days` (optional): Time period in days (default: 30)
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/betting/performance?days=90"
-```
-
-#### Get Betting Trends
-```bash
-GET /betting/trends
-```
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/betting/trends"
-```
-
-#### Find Value Bets
-```bash
-GET /betting/value-bets
-```
-
-**Query Parameters:**
-- `competitionId` (optional): Filter by competition
-- `minValue` (optional): Minimum value percentage (default: 5.0)
-- `limit` (optional): Number of results
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/betting/value-bets?minValue=10.0&limit=20"
-```
-
-#### Get Match Odds
-```bash
-GET /betting/odds/:matchId
-```
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/betting/odds/123"
-```
-
-#### Get Kelly Criterion Recommendations
-```bash
-GET /betting/kelly/:matchId
-```
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/betting/kelly/123"
-```
-
-### 6. 📊 Analytics
-
-#### Get Dashboard Analytics
-```bash
-GET /analytics/dashboard
-```
-
-**Query Parameters:**
-- `competitionId` (optional): Filter by competition
-- `season` (optional): Filter by season
-- `days` (optional): Time period in days (default: 30)
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/analytics/dashboard?competitionId=1&days=90"
-```
-
-#### Get Team Analytics
-```bash
-GET /analytics/team/:id
-```
-
-**Query Parameters:**
-- `season` (optional): Filter by season
-- `days` (optional): Time period in days
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/analytics/team/1?season=2023"
-```
-
-#### Get Competition Analytics
-```bash
-GET /analytics/competition/:id
-```
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/analytics/competition/1"
-```
-
-#### Get Trend Analysis
-```bash
-GET /analytics/trends
-```
-
-**Query Parameters:**
-- `competitionId` (optional): Filter by competition
-- `days` (optional): Time period in days
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/analytics/trends?days=60"
-```
-
-#### Get Performance Metrics
-```bash
-GET /analytics/performance
-```
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/analytics/performance"
-```
-
-#### Get Team Rankings
-```bash
-GET /analytics/teams/ranking
-```
-
-**Query Parameters:**
-- `competitionId` (optional): Filter by competition
-- `season` (optional): Filter by season
-- `limit` (optional): Number of results (default: 20)
-- `sortBy` (optional): Sort criteria (points, wins, goals, winRate)
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/analytics/teams/ranking?competitionId=1&sortBy=points&limit=10"
-```
-
-#### Get Upcoming Matches Analytics
-```bash
-GET /analytics/matches/upcoming
-```
-
-**Example:**
-```bash
-curl "http://localhost:3000/api/v1/analytics/matches/upcoming"
-```
-
-### 7. 🔧 Admin
-
-#### Get System Status
-```bash
-GET /admin/status
-```
-
-**Example:**
+### **System Status**
 ```bash
 curl "http://localhost:3000/api/v1/admin/status"
 ```
 
-#### Get Health Check
+### **Setup System (Regular)**
 ```bash
-GET /admin/health
+curl -X POST "http://localhost:3000/api/v1/admin/setup" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"includeTeams\": true,
+    \"includeMatches\": true,
+    \"daysBack\": 30
+  }"
 ```
 
-**Example:**
+### **Setup System (Conservative)**
 ```bash
-curl "http://localhost:3000/api/v1/admin/health"
+curl -X POST "http://localhost:3000/api/v1/admin/setup-conservative" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"includeTeams\": true,
+    \"includeMatches\": true,
+    \"daysBack\": 30
+  }"
 ```
 
-#### Run Background Job
+### **Setup System (Free Tier Optimized)** ⭐ **NEW!**
 ```bash
-POST /admin/jobs/:jobName/run
+curl -X POST "http://localhost:3000/api/v1/admin/setup-free-tier" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"includeTeams\": true,
+    \"includeMatches\": true,
+    \"daysBack\": 365
+  }"
 ```
 
-**Example:**
+### **Run Background Job**
 ```bash
 curl -X POST "http://localhost:3000/api/v1/admin/jobs/updateMatches/run"
 ```
 
-#### Initialize System
+### **Health Check**
 ```bash
-POST /admin/setup
+curl "http://localhost:3000/api/v1/admin/health"
 ```
 
-**Example:**
-```bash
-curl -X POST "http://localhost:3000/api/v1/admin/setup"
-```
-
-#### Clear Cache
-```bash
-POST /admin/cache/clear
-```
-
-**Example:**
+### **Clear Cache**
 ```bash
 curl -X POST "http://localhost:3000/api/v1/admin/cache/clear"
 ```
 
-#### Clean Old Data
+### **Data Cleanup**
 ```bash
-POST /admin/data/cleanup
+curl -X POST "http://localhost:3000/api/v1/admin/data/cleanup" \
+  -H "Content-Type: application/json" \
+  -d "{\"daysToKeep\": 730}"
 ```
 
-**Example:**
-```bash
-curl -X POST "http://localhost:3000/api/v1/admin/data/cleanup"
-```
+## 📝 **Response Format**
 
-## 🔍 Response Format
-
-All API responses follow this structure:
-
-### Success Response
+### **Success Response**
 ```json
 {
   "success": true,
-  "message": "Operation completed successfully",
   "data": {
     // Response data here
   },
-  "timestamp": "2023-08-24T01:06:00.000Z"
+  "message": "Operation completed successfully"
 }
 ```
 
-### Error Response
+### **Error Response**
 ```json
 {
   "success": false,
   "error": {
     "message": "Error description",
-    "details": "Additional error details"
+    "details": "Detailed error information"
   }
 }
 ```
 
-## 📝 Common HTTP Status Codes
+## 🔒 **Authentication & Rate Limiting**
 
-| Code | Description |
-|------|-------------|
-| 200 | OK - Request successful |
-| 201 | Created - Resource created successfully |
-| 400 | Bad Request - Invalid parameters |
-| 401 | Unauthorized - Authentication required |
-| 403 | Forbidden - Insufficient permissions |
-| 404 | Not Found - Resource not found |
-| 429 | Too Many Requests - Rate limit exceeded |
-| 500 | Internal Server Error - Server error |
-| 503 | Service Unavailable - Service temporarily unavailable |
+- **Authentication**: Currently not required (development mode)
+- **Rate Limiting**: Respects Football-Data.org API limits (10 req/min for free tier)
+- **CORS**: Enabled for development
 
-## 🚦 Rate Limiting
+## 📚 **Data Models**
 
-- **Rate Limit**: 100 requests per minute per IP
-- **Headers**: 
-  - `X-RateLimit-Limit`: Maximum requests per window
-  - `X-RateLimit-Remaining`: Remaining requests in current window
-  - `X-RateLimit-Reset`: Time when the rate limit resets
-
-## 💾 Caching
-
-The API uses Redis caching for improved performance:
-- **Competition data**: 1 hour
-- **Team data**: 30 minutes
-- **Match data**: 15 minutes
-- **Predictions**: 5 minutes
-- **Analytics**: 10 minutes
-
-## 🛠️ Testing Examples
-
-### 1. Get Premier League Competitions
-```bash
-curl "http://localhost:3000/api/v1/competitions?plan=TIER_ONE&limit=5"
+### **Match Structure**
+```json
+{
+  "id": 12345,
+  "homeTeamId": 1,
+  "awayTeamId": 2,
+  "homeTeamScore": 2,
+  "awayTeamScore": 1,
+  "status": "FINISHED",
+  "winner": "HOME_TEAM",
+  "utcDate": "2024-01-15T20:00:00Z",
+  "competitionId": 2021,
+  "season": 2024
+}
 ```
 
-### 2. Get Team Matches for Season 2023
-```bash
-curl "http://localhost:3000/api/v1/teams/1/matches?season=2023&limit=10"
+### **Team Structure**
+```json
+{
+  "id": 1,
+  "name": "Manchester United",
+  "shortName": "Man Utd",
+  "tla": "MUN",
+  "venueCapacity": 74140,
+  "competitionId": 2021
+}
 ```
 
-### 3. Get Upcoming Matches
-```bash
-curl "http://localhost:3000/api/v1/matches/upcoming?limit=5"
+### **Competition Structure**
+```json
+{
+  "id": 2021,
+  "name": "Premier League",
+  "code": "PL",
+  "type": "LEAGUE",
+  "plan": "TIER_ONE",
+  "country": "England",
+  "countryCode": "GB"
+}
 ```
 
-### 4. Train AI Model for Competition
+## 🚀 **Quick Start Examples**
+
+### **1. Check System Health**
 ```bash
-curl -X POST "http://localhost:3000/api/v1/predictions/train" \
+curl http://localhost:3000/health
+```
+
+### **2. Setup Data Collection**
+```bash
+curl -X POST "http://localhost:3000/api/v1/admin/setup-free-tier" \
   -H "Content-Type: application/json" \
-  -d '{
-    "competitionId": 1,
-    "season": 2023,
-    "modelTypes": ["random_forest"]
-  }'
+  -d "{\"includeTeams\":true,\"includeMatches\":true,\"daysBack\":365}"
 ```
 
-### 5. Get Match Prediction
+### **3. Train AI Model**
 ```bash
-curl -X POST "http://localhost:3000/api/v1/predictions/predict" \
+curl -X POST "http://localhost:3000/api/v1/admin/ai/train" \
   -H "Content-Type: application/json" \
-  -d '{
-    "matchId": 123
-  }'
+  -d "{\"modelTypes\":[\"random_forest\"],\"maxTrainingTime\":15}"
 ```
 
-### 6. Analyze Betting Odds
+### **4. Make Prediction**
 ```bash
-curl -X POST "http://localhost:3000/api/v1/betting/analyze" \
+curl -X POST "http://localhost:3000/api/v1/admin/ai/predict" \
   -H "Content-Type: application/json" \
-  -d '{
-    "matchId": 123,
-    "odds": {
-      "homeWin": 2.10,
-      "draw": 3.20,
-      "awayWin": 3.50
-    }
-  }'
+  -d "{\"matchId\":12345}"
 ```
 
-### 7. Get Dashboard Analytics
-```bash
-curl "http://localhost:3000/api/v1/analytics/dashboard?days=30"
-```
+## 📖 **Additional Resources**
 
-## 🔧 Troubleshooting
-
-### Common Issues
-
-1. **Connection Refused**: Make sure the API server is running
-2. **Rate Limit Exceeded**: Wait for the rate limit to reset
-3. **Validation Errors**: Check request parameters and body format
-4. **Redis Connection Issues**: Check if Redis service is running
-
-### Debug Commands
-
-1. **Check API Health**:
-   ```bash
-   curl http://localhost:3000/health
-   ```
-
-2. **Check Redis Connection**:
-   ```bash
-   node test-redis.js
-   ```
-
-3. **Debug Redis Issues**:
-   ```bash
-   node debug-redis.js
-   ```
-
-## 📚 Additional Resources
-
-- **API Documentation**: Check the `/docs/api.md` file
-- **Environment Variables**: See `env.example` for configuration options
-- **Docker Setup**: Use `docker-compose.yml` for easy deployment
-- **Testing**: Run tests with `npm test`
-
-## 🆘 Support
-
-If you encounter issues:
-1. Check the API health endpoint
-2. Review the logs in the `logs/` directory
-3. Check Docker container status
-4. Verify environment variables are set correctly
+- **AI Training Guide**: `AI_TRAINING_GUIDE.md`
+- **Docker Deployment**: `DOCKER_DEPLOYMENT.md`
+- **Project Plan**: `plan.md`
 
 ---
 
-**Happy coding with the Football AI Prediction API! 🚀⚽**
+**Happy Coding! 🚀⚽**

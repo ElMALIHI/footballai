@@ -2,6 +2,7 @@ const express = require('express');
 const Joi = require('joi');
 const BackgroundJobs = require('../services/BackgroundJobs');
 const DataProcessor = require('../services/DataProcessor');
+const ModelTrainer = require('../services/ModelTrainer');
 const { Competition } = require('../models');
 const logger = require('../config/logger');
 
@@ -10,6 +11,7 @@ const router = express.Router();
 // Initialize services
 const backgroundJobs = new BackgroundJobs();
 const dataProcessor = new DataProcessor();
+const modelTrainer = new ModelTrainer();
 
 // Validation schemas
 const jobNameSchema = Joi.object({
@@ -553,6 +555,407 @@ router.post('/data/cleanup', async (req, res, next) => {
   } catch (error) {
     logger.error('Manual data cleanup failed', error);
     next(error);
+  }
+});
+
+// AI Model Training Endpoints
+
+// POST /api/v1/admin/ai/train - Train AI models
+router.post('/ai/train', async (req, res, next) => {
+  try {
+    const schema = Joi.object({
+      modelTypes: Joi.array().items(Joi.string().valid('random_forest', 'neural_network')).default(['random_forest']),
+      crossValidationFolds: Joi.number().integer().min(2).max(10).default(5),
+      hyperparameterTuning: Joi.boolean().default(true),
+      testSize: Joi.number().min(0.1).max(0.5).default(0.2),
+      randomState: Joi.number().integer().default(42),
+      maxTrainingTime: Joi.number().integer().min(5).max(120).default(30), // minutes
+      season: Joi.number().integer().min(2020).max(2030).optional(),
+      competitionId: Joi.number().integer().optional(),
+      daysBack: Joi.number().integer().min(90).max(1095).default(730), // 3 months to 3 years
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Validation Error',
+          details: error.details,
+        },
+      });
+    }
+
+    const {
+      modelTypes,
+      crossValidationFolds,
+      hyperparameterTuning,
+      testSize,
+      randomState,
+      maxTrainingTime,
+      season,
+      competitionId,
+      daysBack,
+    } = value;
+
+    logger.info('AI model training initiated', {
+      modelTypes,
+      crossValidationFolds,
+      hyperparameterTuning,
+      testSize,
+      maxTrainingTime,
+      season,
+      competitionId,
+      daysBack,
+    });
+
+    // Start training in background
+    const trainingPromise = modelTrainer.trainModels({
+      modelTypes,
+      crossValidationFolds,
+      hyperparameterTuning,
+      testSize,
+      randomState,
+      maxTrainingTime: maxTrainingTime * 60 * 1000, // Convert to milliseconds
+      trainingDataOptions: {
+        season,
+        competitionId,
+        daysBack,
+      },
+    });
+
+    // Wait for training to complete (or timeout)
+    const result = await Promise.race([
+      trainingPromise,
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Training timeout')), (maxTrainingTime + 5) * 60 * 1000)
+      ),
+    ]);
+
+    logger.info('AI model training completed successfully');
+
+    res.json({
+      success: true,
+      message: 'AI models trained successfully',
+      data: {
+        ...result,
+        trainingOptions: {
+          modelTypes,
+          crossValidationFolds,
+          hyperparameterTuning,
+          testSize,
+          maxTrainingTime,
+          season,
+          competitionId,
+          daysBack,
+        },
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+  } catch (error) {
+    logger.error('AI model training failed:', error);
+    
+    if (error.message === 'Training timeout') {
+      res.status(408).json({
+        success: false,
+        error: {
+          message: 'Training Timeout',
+          details: `Training exceeded ${req.body.maxTrainingTime || 30} minutes`,
+        },
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Training Failed',
+          details: error.message,
+        },
+      });
+    }
+  }
+});
+
+// GET /api/v1/admin/ai/models - List all trained models
+router.get('/ai/models', async (req, res, next) => {
+  try {
+    const models = await modelTrainer.mlModels.listModels();
+    const modelDetails = [];
+
+    for (const model of models) {
+      try {
+        const modelData = await modelTrainer.mlModels.loadModel(model.name);
+        modelDetails.push({
+          ...model,
+          modelInfo: modelTrainer.mlModels.getModelInfo(modelData),
+        });
+      } catch (error) {
+        logger.warn(`Could not load model ${model.name}:`, error.message);
+        modelDetails.push({
+          ...model,
+          modelInfo: null,
+          error: error.message,
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        models: modelDetails,
+        total: models.length,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    logger.error('Error listing AI models:', error);
+    next(error);
+  }
+});
+
+// GET /api/v1/admin/ai/models/:modelName - Get specific model details
+router.get('/ai/models/:modelName', async (req, res, next) => {
+  try {
+    const { modelName } = req.params;
+    const model = await modelTrainer.mlModels.loadModel(modelName);
+    const modelInfo = modelTrainer.mlModels.getModelInfo(model);
+
+    res.json({
+      success: true,
+      data: {
+        model,
+        modelInfo,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    logger.error(`Error loading model ${req.params.modelName}:`, error);
+    res.status(404).json({
+      success: false,
+      error: {
+        message: 'Model Not Found',
+        details: error.message,
+      },
+    });
+  }
+});
+
+// DELETE /api/v1/admin/ai/models/:modelName - Delete a model
+router.delete('/ai/models/:modelName', async (req, res, next) => {
+  try {
+    const { modelName } = req.params;
+    await modelTrainer.mlModels.deleteModel(modelName);
+
+    res.json({
+      success: true,
+      message: `Model ${modelName} deleted successfully`,
+      data: {
+        deletedModel: modelName,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    logger.error(`Error deleting model ${req.params.modelName}:`, error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Delete Failed',
+        details: error.message,
+      },
+    });
+  }
+});
+
+// POST /api/v1/admin/ai/evaluate/:modelName - Evaluate a specific model
+router.post('/ai/evaluate/:modelName', async (req, res, next) => {
+  try {
+    const { modelName } = req.params;
+    const schema = Joi.object({
+      testSize: Joi.number().min(0.1).max(0.5).default(0.2),
+      daysBack: Joi.number().integer().min(30).max(1095).default(365),
+      competitionId: Joi.number().integer().optional(),
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Validation Error',
+          details: error.details,
+        },
+      });
+    }
+
+    const { testSize, daysBack, competitionId } = value;
+
+    // Load model
+    const model = await modelTrainer.mlModels.loadModel(modelName);
+    
+    // Get test data
+    const testData = await modelTrainer.getTrainingData({
+      daysBack,
+      competitionId,
+      limit: 1000,
+    });
+
+    if (testData.length < 50) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Insufficient Test Data',
+          details: `Need at least 50 matches for evaluation, got ${testData.length}`,
+        },
+      });
+    }
+
+    // Evaluate model
+    const evaluation = await modelTrainer.mlModels.evaluateModel(model, testData);
+
+    res.json({
+      success: true,
+      message: `Model ${modelName} evaluated successfully`,
+      data: {
+        modelName,
+        evaluation,
+        testDataStats: {
+          totalMatches: testData.length,
+          testSize,
+          daysBack,
+          competitionId,
+        },
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+  } catch (error) {
+    logger.error(`Error evaluating model ${req.params.modelName}:`, error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Evaluation Failed',
+        details: error.message,
+      },
+    });
+  }
+});
+
+// GET /api/v1/admin/ai/training-stats - Get training statistics
+router.get('/ai/training-stats', async (req, res, next) => {
+  try {
+    await modelTrainer.loadTrainingHistory();
+    const stats = modelTrainer.getTrainingStats();
+    const modelComparison = await modelTrainer.compareModels();
+
+    res.json({
+      success: true,
+      data: {
+        ...stats,
+        modelComparison,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    logger.error('Error getting training stats:', error);
+    next(error);
+  }
+});
+
+// POST /api/v1/admin/ai/predict - Make predictions with trained models
+router.post('/api/v1/admin/ai/predict', async (req, res, next) => {
+  try {
+    const schema = Joi.object({
+      matchId: Joi.number().integer().required(),
+      modelName: Joi.string().optional(),
+      modelType: Joi.string().valid('random_forest', 'neural_network').optional(),
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Validation Error',
+          details: error.details,
+        },
+      });
+    }
+
+    const { matchId, modelName, modelType } = value;
+
+    // Generate features for the match
+    const features = await modelTrainer.featureEngineering.generateMatchFeatures(matchId, true);
+    const normalizedFeatures = modelTrainer.featureEngineering.normalizeFeatures(features);
+
+    // Remove non-numeric features
+    const numericFeatures = {};
+    Object.entries(normalizedFeatures).forEach(([key, value]) => {
+      if (typeof value === 'number' && !isNaN(value)) {
+        numericFeatures[key] = value;
+      }
+    });
+
+    let predictions = {};
+
+    if (modelName) {
+      // Use specific model
+      const model = await modelTrainer.mlModels.loadModel(modelName);
+      if (model.type === 'random_forest') {
+        predictions[modelName] = await modelTrainer.mlModels.predictRandomForest(model, numericFeatures);
+      } else {
+        predictions[modelName] = { prediction: 'UNKNOWN', confidence: 0, note: 'Model type not supported for prediction' };
+      }
+    } else if (modelType) {
+      // Use best model of specific type
+      const models = await modelTrainer.mlModels.listModels();
+      const typeModels = models.filter(m => m.name.includes(modelType));
+      
+      for (const model of typeModels) {
+        try {
+          const modelData = await modelTrainer.mlModels.loadModel(model.name);
+          if (modelData.type === 'random_forest') {
+            predictions[model.name] = await modelTrainer.mlModels.predictRandomForest(modelData, numericFeatures);
+          }
+        } catch (error) {
+          logger.warn(`Could not use model ${model.name} for prediction:`, error.message);
+        }
+      }
+    } else {
+      // Use all available models
+      const models = await modelTrainer.mlModels.listModels();
+      
+      for (const model of models) {
+        try {
+          const modelData = await modelTrainer.mlModels.loadModel(model.name);
+          if (modelData.type === 'random_forest') {
+            predictions[model.name] = await modelTrainer.mlModels.predictRandomForest(modelData, numericFeatures);
+          }
+        } catch (error) {
+          logger.warn(`Could not use model ${model.name} for prediction:`, error.message);
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Predictions generated successfully',
+      data: {
+        matchId,
+        features: numericFeatures,
+        predictions,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+  } catch (error) {
+    logger.error('Error making predictions:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Prediction Failed',
+        details: error.message,
+      },
+    });
   }
 });
 
