@@ -2,7 +2,7 @@ const request = require('supertest');
 const { expect } = require('chai');
 const sinon = require('sinon');
 const FootballDataAPI = require('../../../src/services/FootballDataAPI');
-const redisClient = require('../../../src/config/redis');
+const { redis } = require('../../../src/config/redis');
 
 describe('FootballDataAPI', () => {
   let footballAPI;
@@ -10,7 +10,7 @@ describe('FootballDataAPI', () => {
 
   beforeEach(() => {
     footballAPI = new FootballDataAPI();
-    redisStub = sinon.stub(redisClient);
+    redisStub = sinon.stub(redis);
   });
 
   afterEach(() => {

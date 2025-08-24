@@ -11,7 +11,6 @@ const Team = sequelize.define(
     },
     externalId: {
       type: DataTypes.INTEGER,
-      unique: true,
       allowNull: false,
       comment: 'ID from Football-Data.org API',
     },

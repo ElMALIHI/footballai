@@ -1,6 +1,6 @@
 // Test setup file for Jest
 const { sequelize } = require('../src/config/database');
-const redisClient = require('../src/config/redis');
+const { getRedisClient } = require('../src/config/redis');
 
 // Set test environment
 process.env.NODE_ENV = 'test';
@@ -14,7 +14,7 @@ beforeAll(async () => {
   await sequelize.sync({ force: true });
   
   // Connect to test Redis
-  await redisClient.connect();
+  await getRedisClient().connect();
 });
 
 // Global test teardown
@@ -23,7 +23,7 @@ afterAll(async () => {
   await sequelize.close();
   
   // Close Redis connection
-  await redisClient.disconnect();
+  await getRedisClient().disconnect();
 });
 
 // Mock external services

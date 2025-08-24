@@ -11,7 +11,6 @@ const Competition = sequelize.define(
     },
     externalId: {
       type: DataTypes.INTEGER,
-      unique: true,
       allowNull: false,
       comment: 'ID from Football-Data.org API',
     },
@@ -22,7 +21,6 @@ const Competition = sequelize.define(
     code: {
       type: DataTypes.STRING(10),
       allowNull: false,
-      unique: true,
       comment: 'Competition code (e.g., PL, CL, BL1)',
     },
     type: {
@@ -36,7 +34,8 @@ const Competition = sequelize.define(
     },
     countryCode: {
       type: DataTypes.STRING(3),
-      allowNull: false,
+      allowNull: true, // Changed from false to true
+      comment: 'Country code (e.g., ENG, ESP, GER)',
     },
     emblem: {
       type: DataTypes.STRING,

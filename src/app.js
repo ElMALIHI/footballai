@@ -7,8 +7,11 @@ const rateLimit = require('express-rate-limit');
 
 const logger = require('./config/logger');
 const { sequelize } = require('./config/database');
-const { redisClient } = require('./config/redis');
+const { getRedisClient } = require('./config/redis');
 const BackgroundJobs = require('./services/BackgroundJobs');
+
+// Import models to ensure they are registered with Sequelize
+require('./models');
 
 // Import routes
 const competitionsRoutes = require('./routes/competitions');
@@ -72,13 +75,51 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(requestLogger);
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development',
-  });
+app.get('/health', async (req, res) => {
+  try {
+    const healthStatus = {
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+      services: {
+        database: 'unknown',
+        redis: 'unknown'
+      }
+    };
+
+    // Check database connection
+    try {
+      await sequelize.authenticate();
+      healthStatus.services.database = 'connected';
+    } catch (error) {
+      healthStatus.services.database = 'error';
+      healthStatus.status = 'DEGRADED';
+    }
+
+    // Check Redis connection
+    try {
+      const redisClient = getRedisClient();
+      if (redisClient.isOpen) {
+        await redisClient.ping();
+        healthStatus.services.redis = 'connected';
+      } else {
+        healthStatus.services.redis = 'disconnected';
+        healthStatus.status = 'DEGRADED';
+      }
+    } catch (error) {
+      healthStatus.services.redis = 'error';
+      healthStatus.status = 'DEGRADED';
+    }
+
+    res.status(200).json(healthStatus);
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
 });
 
 // API routes
@@ -121,7 +162,7 @@ const gracefulShutdown = async (signal) => {
     logger.info('Database connection closed');
     
     // Close Redis connection
-    await redisClient.disconnect();
+    await getRedisClient().disconnect();
     logger.info('Redis connection closed');
     
     process.exit(0);
@@ -153,19 +194,47 @@ const startServer = async () => {
     await sequelize.authenticate();
     logger.info('Database connection established successfully');
     
-    // Sync database models (in development)
+    // Sync database models (only in development, use migrations in production)
     if (process.env.NODE_ENV === 'development') {
-      await sequelize.sync({ alter: true });
-      logger.info('Database models synchronized');
+      // Temporarily disable sync to avoid schema errors
+      logger.info('Development mode: skipping database sync to avoid schema conflicts');
+      // await sequelize.sync({ alter: true });
+      // logger.info('Database models synchronized');
+    } else {
+      // In production, just verify the connection without syncing
+      logger.info('Production mode: skipping database sync (use migrations)');
     }
     
-    // Connect to Redis
-    await redisClient.connect();
-    logger.info('Redis client connecting...');
+    // Connect to Redis with retry logic
+    let redisConnected = false;
+    let retryCount = 0;
+    const maxRetries = 5;
+    
+    while (!redisConnected && retryCount < maxRetries) {
+      try {
+        logger.info(`Attempting Redis connection (attempt ${retryCount + 1}/${maxRetries})...`);
+        await getRedisClient().connect();
+        logger.info('Redis client connecting...');
 
-    // Test Redis connection
-    await redisClient.ping();
-    logger.info('Redis connection established successfully');
+        // Test Redis connection
+        await getRedisClient().ping();
+        logger.info('Redis connection established successfully');
+        redisConnected = true;
+      } catch (error) {
+        retryCount++;
+        logger.error(`Redis connection attempt ${retryCount} failed:`, error.message);
+        
+        if (retryCount >= maxRetries) {
+          logger.error('Max Redis connection retries reached. Starting server without Redis...');
+          break;
+        }
+        
+        // Wait before retrying
+        const waitTime = Math.min(1000 * retryCount, 5000);
+        logger.info(`Waiting ${waitTime}ms before retrying Redis connection...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
     
     // Start background jobs in production and development
     if (process.env.NODE_ENV !== 'test') {
@@ -177,6 +246,11 @@ const startServer = async () => {
       logger.info(`Server is running on port ${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`API Base URL: http://localhost:${PORT}${basePath}`);
+      if (redisConnected) {
+        logger.info('Redis: Connected');
+      } else {
+        logger.warn('Redis: Not connected - some features may be limited');
+      }
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

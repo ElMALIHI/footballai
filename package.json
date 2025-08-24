@@ -15,7 +15,7 @@
     "db:migrate": "sequelize-cli db:migrate",
     "db:seed": "sequelize-cli db:seed:all",
     "db:reset": "sequelize-cli db:drop && sequelize-cli db:create && sequelize-cli db:migrate && sequelize-cli db:seed:all",
-    "build": "echo \"No build specified\""
+    "build": "mkdir -p logs models data && echo 'Build completed - directories created'"
   },
   "keywords": [
     "football",

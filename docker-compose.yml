@@ -1,14 +1,13 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: footballai_postgres
     environment:
-      POSTGRES_DB: footballai
-      POSTGRES_USER: footballai
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-footballai_password}
+      POSTGRES_DB: football_ai_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-321007}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
@@ -17,7 +16,7 @@ services:
     networks:
       - footballai_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U footballai -d footballai"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d football_ai_db"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -27,7 +26,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: footballai_redis
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-footballai_redis}
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-321007} --bind 0.0.0.0 --protected-mode no
     volumes:
       - redis_data:/data
     ports:
@@ -40,6 +39,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    restart: unless-stopped
 
   # Football AI API
   api:
@@ -49,24 +49,36 @@ services:
       target: production
     container_name: footballai_api
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: footballai
-      DB_USER: footballai
-      DB_PASSWORD: ${DB_PASSWORD:-footballai_password}
+      DB_NAME: football_ai_db
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD:-321007}
+      DB_DIALECT: postgres
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-footballai_redis}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-321007}
+      REDIS_DB: 0
+      REDIS_FAMILY: 4
+      REDIS_CONNECT_TIMEOUT: 10000
+      REDIS_COMMAND_TIMEOUT: 5000
       FOOTBALL_API_KEY: ${FOOTBALL_API_KEY}
       JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_here}
-      API_RATE_LIMIT_WINDOW: 60000
-      API_RATE_LIMIT_MAX: 100
+      RATE_LIMIT_WINDOW_MS: 60000
+      RATE_LIMIT_MAX_REQUESTS: 100
       ML_PREDICTION_THRESHOLD: 0.6
+      ML_MODEL_PATH: ./models
+      ML_TRAINING_DATA_PATH: ./data/training
       BETTING_MIN_VALUE_THRESHOLD: 0.05
       BETTING_MAX_KELLY_FRACTION: 0.25
       BETTING_MIN_CONFIDENCE_THRESHOLD: 0.6
+      LOG_LEVEL: info
+      LOG_FILE: logs/app.log
+      API_VERSION: v1
+      API_PREFIX: /api
+      CORS_ORIGIN: http://localhost:3000
     ports:
       - "3000:3000"
     volumes:
@@ -110,7 +122,7 @@ services:
     image: rediscommander/redis-commander:latest
     container_name: footballai_redis_commander
     environment:
-      REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD:-footballai_redis}
+      REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD:-321007}
     ports:
       - "8081:8081"
     depends_on:
@@ -189,3 +201,6 @@ volumes:
 networks:
   footballai_network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

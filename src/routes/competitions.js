@@ -62,8 +62,8 @@ router.get('/', async (req, res, next) => {
               name: comp.name,
               code: comp.code,
               type: comp.type,
-              country: comp.area.name,
-              countryCode: comp.area.countryCode,
+              country: comp.area?.name || 'Unknown',
+              countryCode: comp.area?.countryCode || null,
               emblem: comp.emblem,
               plan: comp.plan,
               currentSeason: comp.currentSeason?.startDate ? 
@@ -145,8 +145,8 @@ router.get('/:id', async (req, res, next) => {
           name: apiData.name,
           code: apiData.code,
           type: apiData.type,
-          country: apiData.area.name,
-          countryCode: apiData.area.countryCode,
+          country: apiData.area?.name || 'Unknown',
+          countryCode: apiData.area?.countryCode || null,
           emblem: apiData.emblem,
           plan: apiData.plan,
           currentSeason: apiData.currentSeason?.startDate ? 

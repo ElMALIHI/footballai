@@ -1,149 +1,177 @@
 const redis = require('redis');
 const logger = require('./logger');
 
-const redisClient = redis.createClient({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: process.env.REDIS_PORT || 6379,
-  password: process.env.REDIS_PASSWORD || undefined,
-  db: process.env.REDIS_DB || 0,
-  retry_strategy: (options) => {
-    if (options.error && options.error.code === 'ECONNREFUSED') {
-      // End reconnecting on a specific error and flush all commands with a individual error
-      logger.error('Redis server refused connection');
-      return new Error('Redis server refused connection');
+// Create Redis client function to ensure environment variables are loaded
+const createRedisClient = () => {
+  const host = process.env.REDIS_HOST;
+  const port = process.env.REDIS_PORT || 6379;
+  const password = process.env.REDIS_PASSWORD;
+  const db = process.env.REDIS_DB || 0;
+  const family = process.env.REDIS_FAMILY || 4;
+  const connectTimeout = process.env.REDIS_CONNECT_TIMEOUT || 10000;
+  const commandTimeout = process.env.REDIS_COMMAND_TIMEOUT || 5000;
+  
+  if (!host) {
+    throw new Error('REDIS_HOST environment variable is required');
+  }
+  
+  logger.info(`Redis config - Host: ${host}, Port: ${port}, Password: ${password ? '***' : 'none'}, DB: ${db}, Family: ${family}`);
+  
+  // Create Redis client with proper configuration for Docker and Redis v4
+  const client = redis.createClient({
+    socket: {
+      host: host,
+      port: port,
+      // Force IPv4 to avoid IPv6 connection issues
+      family: parseInt(family),
+      // Add connection timeout
+      connectTimeout: parseInt(connectTimeout),
+      // Add command timeout
+      commandTimeout: parseInt(commandTimeout),
+    },
+    password: password || undefined,
+    database: db,
+  });
+
+  // Add better error handling
+  client.on('error', (err) => {
+    logger.error('Redis client error:', err);
+  });
+
+  client.on('connect', () => {
+    logger.info('Redis client connecting...');
+  });
+
+  client.on('ready', () => {
+    logger.info('Redis client ready');
+  });
+
+  client.on('end', () => {
+    logger.info('Redis client disconnected');
+  });
+
+  client.on('reconnecting', () => {
+    logger.info('Redis client reconnecting...');
+  });
+
+  return client;
+};
+
+// Initialize client as null, will be created when needed
+let redisClient = null;
+
+// Function to get or create Redis client
+const getRedisClient = () => {
+  if (!redisClient) {
+    try {
+      redisClient = createRedisClient();
+    } catch (error) {
+      logger.error('Failed to create Redis client:', error);
+      throw error;
     }
-    if (options.total_retry_time > 1000 * 60 * 60) {
-      // End reconnecting after a specific timeout and flush all commands with a individual error
-      logger.error('Redis retry time exhausted');
-      return new Error('Retry time exhausted');
+  }
+  return redisClient;
+};
+
+// Function to check if Redis client is available and connected
+const isRedisAvailable = () => {
+  try {
+    const client = getRedisClient();
+    return client && client.isOpen;
+  } catch (error) {
+    return false;
+  }
+};
+
+// Function to safely execute Redis operations
+const safeRedisOperation = async (operation) => {
+  try {
+    if (!isRedisAvailable()) {
+      throw new Error('Redis client not available');
     }
-    if (options.attempt > 10) {
-      // End reconnecting with built in error
-      logger.error('Redis max retry attempts reached');
-      return undefined;
-    }
-    // Reconnect after
-    return Math.min(options.attempt * 100, 3000);
-  },
-});
-
-redisClient.on('connect', () => {
-  logger.info('Redis client connected');
-});
-
-redisClient.on('error', (err) => {
-  logger.error('Redis client error:', err);
-});
-
-redisClient.on('ready', () => {
-  logger.info('Redis client ready');
-});
-
-redisClient.on('end', () => {
-  logger.info('Redis client disconnected');
-});
+    return await operation();
+  } catch (error) {
+    logger.error('Redis operation failed:', error);
+    throw error;
+  }
+};
 
 // Helper functions for common Redis operations
 const redisHelpers = {
   // Set key with expiration
   setEx: async (key, seconds, value) => {
-    try {
-      return await redisClient.setEx(key, seconds, JSON.stringify(value));
-    } catch (error) {
-      logger.error('Redis setEx error:', error);
-      throw error;
-    }
+    return safeRedisOperation(async () => {
+      return await getRedisClient().setEx(key, seconds, JSON.stringify(value));
+    });
   },
 
   // Get key
   get: async (key) => {
-    try {
-      const value = await redisClient.get(key);
+    return safeRedisOperation(async () => {
+      const value = await getRedisClient().get(key);
       return value ? JSON.parse(value) : null;
-    } catch (error) {
-      logger.error('Redis get error:', error);
-      throw error;
-    }
+    });
   },
 
   // Delete key
   del: async (key) => {
-    try {
-      return await redisClient.del(key);
-    } catch (error) {
-      logger.error('Redis del error:', error);
-      throw error;
-    }
+    return safeRedisOperation(async () => {
+      return await getRedisClient().del(key);
+    });
   },
 
   // Set hash field
   hSet: async (key, field, value) => {
-    try {
-      return await redisClient.hSet(key, field, JSON.stringify(value));
-    } catch (error) {
-      logger.error('Redis hSet error:', error);
-      throw error;
-    }
+    return safeRedisOperation(async () => {
+      return await getRedisClient().hSet(key, field, JSON.stringify(value));
+    });
   },
 
   // Get hash field
   hGet: async (key, field) => {
-    try {
-      const value = await redisClient.hGet(key, field);
+    return safeRedisOperation(async () => {
+      const value = await getRedisClient().hGet(key, field);
       return value ? JSON.parse(value) : null;
-    } catch (error) {
-      logger.error('Redis hGet error:', error);
-      throw error;
-    }
+    });
   },
 
   // Get all hash fields
   hGetAll: async (key) => {
-    try {
-      const hash = await redisClient.hGetAll(key);
+    return safeRedisOperation(async () => {
+      const hash = await getRedisClient().hGetAll(key);
       const result = {};
       for (const [field, value] of Object.entries(hash)) {
         result[field] = JSON.parse(value);
       }
       return result;
-    } catch (error) {
-      logger.error('Redis hGetAll error:', error);
-      throw error;
-    }
+    });
   },
 
   // Check if key exists
   exists: async (key) => {
-    try {
-      return await redisClient.exists(key);
-    } catch (error) {
-      logger.error('Redis exists error:', error);
-      throw error;
-    }
+    return safeRedisOperation(async () => {
+      return await getRedisClient().exists(key);
+    });
   },
 
   // Set expiration on key
   expire: async (key, seconds) => {
-    try {
-      return await redisClient.expire(key, seconds);
-    } catch (error) {
-      logger.error('Redis expire error:', error);
-      throw error;
-    }
+    return safeRedisOperation(async () => {
+      return await getRedisClient().expire(key, seconds);
+    });
   },
 
   // Flush all keys
   flushAll: async () => {
-    try {
-      return await redisClient.flushAll();
-    } catch (error) {
-      logger.error('Redis flushAll error:', error);
-      throw error;
-    }
+    return safeRedisOperation(async () => {
+      return await getRedisClient().flushAll();
+    });
   },
 };
 
 module.exports = {
-  redisClient,
+  getRedisClient,
+  isRedisAvailable,
+  safeRedisOperation,
   redis: redisHelpers,
 };

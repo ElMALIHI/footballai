@@ -247,8 +247,8 @@ class BackgroundJobs {
 
       // Check Redis connection
       try {
-        const { redisClient } = require('../config/redis');
-        await redisClient.ping();
+        const { getRedisClient } = require('../config/redis');
+        await getRedisClient().ping();
         health.redis = true;
       } catch (error) {
         logger.warn('Redis health check failed:', error.message);
